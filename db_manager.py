@@ -54,6 +54,15 @@ class DatabaseManager:
                         usage_count INTEGER DEFAULT 1
                     )
                 ''')
+
+                # Create last_selected_folder table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS last_selected_folder (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        folder_path TEXT NOT NULL,
+                        last_accessed DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
                 
                 conn.commit()
                 self.logger.info("Database initialized successfully")
@@ -115,9 +124,16 @@ class DatabaseManager:
                         where_clauses.append(f"date({key}) = date(?)")
                         values.append(value)
                     else:
+                        # Convert user's wildcard (*) to SQL wildcard (%)
+                        if '*' in value:
+                            value = value.replace('*', '%')
+                        else:
+                            # If no wildcard, wrap with % for partial matches
+                            value = f"%{value}%"
+                            
                         # For text fields, use case-insensitive LIKE
                         where_clauses.append(f"lower({key}) LIKE lower(?)")
-                        values.append(f"%{value}%")
+                        values.append(value)
                 
                 # Build the SQL query
                 sql = "SELECT * FROM files_metadata"
@@ -249,4 +265,31 @@ class DatabaseManager:
                 return dict(row) if row else None
         except sqlite3.Error as e:
             self.logger.error(f"Error getting file metadata for {file_path}: {e}")
+            return None
+
+    def set_last_selected_folder(self, folder_path: str) -> bool:
+        """Store or update the last selected folder path"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO last_selected_folder (id, folder_path, last_accessed)
+                    VALUES (1, ?, CURRENT_TIMESTAMP)
+                """, (folder_path,))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            self.logger.error(f"Error setting last selected folder: {e}")
+            return False
+
+    def get_last_selected_folder(self) -> Optional[str]:
+        """Get the last selected folder path"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT folder_path FROM last_selected_folder WHERE id = 1")
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except sqlite3.Error as e:
+            self.logger.error(f"Error getting last selected folder: {e}")
             return None

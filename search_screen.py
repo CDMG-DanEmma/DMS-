@@ -57,6 +57,15 @@ class SearchScreen(ttk.Frame):
         )
         title_label.grid(row=0, column=0, sticky='w')
         
+        # Add helper text for wildcards
+        helper_text = ttk.Label(
+            title_frame,
+            text="Use * for wildcards (e.g., *.dwg for all DWG files)",
+            font=("TkDefaultFont", 9),
+            foreground='gray'
+        )
+        helper_text.grid(row=1, column=0, sticky='w', pady=(0, 5))
+        
         # Search Criteria Section
         criteria_frame = ttk.LabelFrame(self, text="Search Criteria", padding=10)
         criteria_frame.grid(row=1, column=0, sticky='ew', padx=20, pady=10)
@@ -115,6 +124,10 @@ class SearchScreen(ttk.Frame):
                 
             widget.grid(row=row, column=col*2+1, padx=5, pady=5, sticky='ew')
             self.search_widgets[field] = widget
+            
+            # Bind Enter key to search function for all entry widgets
+            if isinstance(widget, ttk.Entry):
+                widget.bind('<Return>', lambda e: self._perform_search())
         
         # Button Frame
         button_frame = ttk.Frame(criteria_frame)

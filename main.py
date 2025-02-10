@@ -147,7 +147,11 @@ class JobsScreen(Screen):
             )
             return
 
-        self._process_folder(folder_path)
+        if self._process_folder(folder_path):
+            self.controller.current_folder = folder_path
+            self.refresh()
+            self.controller.refresh_all_screens()
+            self.controller.show_screen("metadata")
 
     def refresh(self):
         """Refresh the recent folders list"""
@@ -193,8 +197,8 @@ class FileManagementSystem:
         # Initialize file scanner
         self.scanner = FileScanner(self.db)
         
-        # Track current folder
-        self.current_folder: Optional[str] = None
+        # Track current folder - try to restore last used folder
+        self.current_folder = self._restore_last_folder()
 
         # Create container for screens
         self.container = ttk.Frame(self.root)
@@ -211,6 +215,20 @@ class FileManagementSystem:
 
         # Show initial screen
         self.show_screen("jobs")
+
+    def _restore_last_folder(self) -> Optional[str]:
+        """Restore the last selected folder if it exists"""
+        try:
+            last_folder = self.db.get_last_selected_folder()
+            if last_folder and os.path.exists(last_folder):
+                self.logger.info(f"Restored last folder: {last_folder}")
+                return last_folder
+            else:
+                self.logger.info("No valid last folder to restore")
+                return None
+        except Exception as e:
+            self.logger.error(f"Error restoring last folder: {e}")
+            return None
 
     def _setup_navigation(self):
         """Create navigation menu"""
@@ -241,6 +259,7 @@ class FileManagementSystem:
         screen = self.screens.get(screen_name)
         if screen:
             screen.tkraise()
+            screen.refresh()  # Refresh the screen when it's shown
             self.logger.info(f"Switched to {screen_name} screen")
 
     def refresh_all_screens(self):

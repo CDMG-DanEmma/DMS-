@@ -213,6 +213,8 @@ class MetadataScreen(ttk.Frame):
             return
             
         folder_path = self.folder_tree.item(selection[0])['values'][0]
+        # Store the selected folder path
+        self.controller.db.set_last_selected_folder(folder_path)
         self._load_files(folder_path)
 
     def _load_files(self, folder_path: str):
@@ -376,15 +378,46 @@ class MetadataScreen(ttk.Frame):
             # Check if we have any items in the tree
             if self.folder_tree.get_children():
                 self.logger.debug("Folder tree populated, selecting root item")
-                root_item = self.folder_tree.get_children()[0]
-                self.folder_tree.selection_set(root_item)
-                self.folder_tree.see(root_item)
+                
+                # Try to get the last selected folder
+                last_folder = self.controller.db.get_last_selected_folder()
+                if last_folder and os.path.exists(last_folder):
+                    # Find and select the last used folder in the tree
+                    self.logger.debug(f"Attempting to restore last selected folder: {last_folder}")
+                    self._select_folder_in_tree(last_folder)
+                else:
+                    # If no last folder or it doesn't exist, select root
+                    root_item = self.folder_tree.get_children()[0]
+                    self.folder_tree.selection_set(root_item)
+                    self.folder_tree.see(root_item)
+                    
                 # Trigger folder selection to load files
                 self._on_folder_selected(None)
             else:
                 self.logger.warning("No items in folder tree after population")
         else:
             self.logger.warning("No current folder set during refresh")
+
+    def _select_folder_in_tree(self, target_folder: str):
+        """Find and select a specific folder in the tree"""
+        def find_item(parent_item=''):
+            for item in self.folder_tree.get_children(parent_item):
+                item_path = self.folder_tree.item(item)['values'][0]
+                if item_path == target_folder:
+                    self.folder_tree.selection_set(item)
+                    self.folder_tree.see(item)
+                    return True
+                elif self.folder_tree.get_children(item):
+                    if find_item(item):
+                        return True
+            return False
+
+        # Start search from root
+        if not find_item():
+            # If folder not found, select root
+            root_item = self.folder_tree.get_children()[0]
+            self.folder_tree.selection_set(root_item)
+            self.folder_tree.see(root_item)
 
     def _add_field(self, parent, field_name: str, widget_type: str = "entry", values: list = None):
         """Helper method to add a metadata field"""
